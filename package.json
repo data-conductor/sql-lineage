@@ -1,0 +1,33 @@
+{
+  "name": "sql-lineage",
+  "version": "0.1.0",
+  "description": "Read a folder of .sql files and work out what depends on what. No database connection, no dbt project, no server.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:web": "node scripts/build-web.mjs",
+    "dev": "npm run build && npm run build:web && node scripts/serve.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "sql", "lineage", "dependency-graph", "data-engineering",
+    "sql-parser", "etl", "dependencies"
+  ],
+  "dependencies": {
+    "@polyglot-sql/sdk": "^0.3.11"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "engines": { "node": ">=18" }
+}

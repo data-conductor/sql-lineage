@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>What Runs First — SQL table dependency graph from your .sql files</title>
+<meta name="description" content="Drop in the .sql files you already have and see what depends on what — write conflicts, unresolved variables and external inputs. Runs entirely in your browser. No signup, no connection string, no dbt project.">
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">
+{ "imports": { "@polyglot-sql/sdk": "./vendor/polyglot/index.js" } }
+</script>
+</head>
+<body>
+
+<header>
+  <div class="wrap brandrow">
+    <a class="brand" href="https://data-conductor.com/"><span class="dot"></span>Data Conductor</a>
+    <nav class="nav">
+      <a href="https://data-conductor.com/docs/">Docs</a>
+      <a href="https://data-conductor.com/#pricing">Pricing</a>
+      <a class="repo" href="https://github.com/data-conductor/sql-lineage">Source on GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>What does your SQL actually depend on?</h1>
+  <p class="sub">Drop in the <code>.sql</code> files you already have — the ones in repos, in cron
+  jobs, in that one folder. Or a schema dump from <code>pg_dump -s</code>. No dbt project required,
+  no connection string, no signup.</p>
+  <p class="privacy"><span class="pdot"></span>Runs entirely in your browser. Your SQL is never uploaded.</p>
+
+  <section id="dropzone" class="dropzone" tabindex="0" aria-label="Add SQL files">
+    <div class="dzinner">
+      <strong>Drop <code>.sql</code> files here</strong>
+      <span>or <button type="button" id="pick" class="linklike">choose files</button> — nothing leaves this page</span>
+    </div>
+  </section>
+  <input type="file" id="fileinput" multiple accept=".sql,.txt,.ddl" hidden>
+
+  <div class="loaded" id="loaded" hidden>
+    <strong id="filecount">0 files</strong>
+    <span class="chips" id="chips"></span>
+    <span class="spacer"></span>
+    <label class="dialect">Dialect
+      <select id="dialect"></select>
+    </label>
+    <button type="button" class="linklike" id="replace">Replace</button>
+  </div>
+
+  <p class="sampling" id="sampling">
+    Showing a worked example — six files from a small analytics estate.
+    <button type="button" class="linklike" id="usesample">Reload it</button>
+  </p>
+
+  <section class="canvas" id="canvas" hidden>
+    <div class="canvhead">
+      <span class="key"><i class="sw src"></i>source</span>
+      <span class="key"><i class="sw der"></i>derived</span>
+      <span class="key"><i class="sw out"></i>output</span>
+      <span class="key"><i class="sw int"></i>internal</span>
+      <span class="key"><i class="sw bad"></i>conflict</span>
+      <span class="stats" id="stats"></span>
+    </div>
+    <div class="svgwrap"><svg id="graph" role="img" aria-label="SQL dependency graph"></svg></div>
+  </section>
+
+  <section id="status" class="status">Loading the parser…</section>
+
+  <section id="findingsblock" hidden>
+    <h2>What we found</h2>
+    <p class="h2sub" id="findsub"></p>
+    <div id="findings"></div>
+  </section>
+
+  <section class="bridge" id="bridge" hidden>
+    <h3>This is what you have. Here's what the graph can't show you.</h3>
+    <p>Every gap below is something the SQL itself doesn't record — which is exactly why
+       the things above go unnoticed.</p>
+    <div class="gaps">
+      <div class="gap"><b>Run order</b><span>Which file runs first, declared rather than inferred from a cron line.</span></div>
+      <div class="gap"><b>QA vs PROD</b><span>Where each <code>{{variable}}</code> resolves, per environment.</span></div>
+      <div class="gap"><b>Version history</b><span>What this graph looked like before last Tuesday.</span></div>
+      <div class="gap"><b>Test coverage</b><span>Which of these tables has anything asserting it's correct.</span></div>
+    </div>
+    <div class="btns">
+      <button type="button" class="btn" id="download">Download graph (JSON)</button>
+      <a class="btn2" id="cta" href="https://data-conductor.com/docs/pipelines/">See how Data Conductor handles run order →</a>
+      <span class="note">Download needs no account.</span>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p><strong>This is open source.</strong> The parser on this page is the same one that runs
+    inside Data Conductor — not a reimplementation of it.
+    <a href="https://github.com/data-conductor/sql-lineage">Read it, fork it, file an issue</a>.
+    MIT licensed.</p>
+    <p class="muted">Things you do once should be free and shouldn't need an account. Things you
+    do repeatedly, that you don't want to maintain a server for, are what we charge for.</p>
+  </footer>
+</main>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
