@@ -60,9 +60,13 @@
       <span class="key"><i class="sw out"></i>output</span>
       <span class="key"><i class="sw int"></i>internal</span>
       <span class="key"><i class="sw bad"></i>conflict</span>
+      <span class="hint">hover a table for the full name</span>
       <span class="stats" id="stats"></span>
     </div>
-    <div class="svgwrap"><svg id="graph" role="img" aria-label="SQL dependency graph"></svg></div>
+    <div class="svgwrap">
+      <svg id="graph" role="img" aria-label="SQL dependency graph"></svg>
+      <div class="hovercard" id="hover" hidden></div>
+    </div>
   </section>
 
   <section id="status" class="status">Loading the parser…</section>
@@ -78,15 +82,21 @@
     <p>Every gap below is something the SQL itself doesn't record — which is exactly why
        the things above go unnoticed.</p>
     <div class="gaps">
-      <div class="gap"><b>Run order</b><span>Which file runs first, declared rather than inferred from a cron line.</span></div>
-      <div class="gap"><b>QA vs PROD</b><span>Where each <code>{{variable}}</code> resolves, per environment.</span></div>
-      <div class="gap"><b>Version history</b><span>What this graph looked like before last Tuesday.</span></div>
-      <div class="gap"><b>Test coverage</b><span>Which of these tables has anything asserting it's correct.</span></div>
+      <div class="gap" data-gap="run-order"><b>Run order</b><span>Which file runs first, declared rather than inferred from a cron line.</span></div>
+      <div class="gap" data-gap="variables"><b>QA vs PROD</b><span>Where each <code>{{variable}}</code> resolves, per environment.</span></div>
+      <div class="gap" data-gap="history"><b>Version history</b><span>What this graph looked like before last Tuesday.</span></div>
+      <div class="gap" data-gap="tests"><b>Test coverage</b><span>Which of these tables has anything asserting it's correct.</span></div>
     </div>
-    <div class="btns">
-      <button type="button" class="btn" id="download">Download graph (JSON)</button>
-      <a class="btn2" id="cta" href="https://data-conductor.com/docs/pipelines/">See how Data Conductor handles run order →</a>
-      <span class="note">Download needs no account.</span>
+    <div class="handoff">
+      <p class="hoh" id="ctahead"></p>
+      <p class="hob" id="ctabody"></p>
+      <div class="btns">
+        <a class="btn" id="ctaprimary" href="https://platform.data-conductor.com/auth/signup"></a>
+        <button type="button" class="btn2" id="download">Download graph (JSON)</button>
+        <a class="linkcta" id="cta" href="https://data-conductor.com/docs/pipelines/"></a>
+      </div>
+      <p class="note">14 days free, no credit card. This page stays free either way — it needs no
+      account, and the download doesn't either.</p>
     </div>
   </section>
 

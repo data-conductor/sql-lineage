@@ -38,9 +38,24 @@ export interface Finding {
   refs: string[];
 }
 
-export interface CallToAction {
+export interface CtaLink {
   label: string;
   href: string;
+}
+
+/** Which of the four gaps in the bridge block this finding lands on. */
+export type GapKey = 'run-order' | 'variables' | 'history' | 'tests';
+
+export interface CallToAction {
+  /** What the product does about THIS finding, in one line. */
+  headline: string;
+  /** Two sentences naming the mechanism, not the benefit. */
+  body: string;
+  /** The product action. */
+  primary: CtaLink;
+  /** The documentation page answering the same gap. */
+  secondary: CtaLink;
+  gap: GapKey;
   /** Why this CTA and not another — shown to nobody, kept for the record. */
   because: FindingKind;
 }
@@ -49,41 +64,85 @@ export interface CallToAction {
  * CTA mapping. Each finding leads somewhere the product genuinely answers
  * that exact gap. A button that does not answer the thing just fired is
  * worse than no button, because it proves the preceding paragraph was bait.
+ *
+ * Two tiers on purpose. The PRIMARY is the product, because a link to a
+ * documentation page is not an offer — it is a reading assignment, and the
+ * person looking at a write conflict in their own files is past wanting one.
+ * The SECONDARY is that documentation page, kept because the claim above the
+ * buttons has to be checkable by someone who does not want to sign up.
  */
+const PLATFORM = 'https://platform.data-conductor.com/auth/signup';
+
+const RUN_ORDER: CallToAction = {
+  headline: 'In Data Conductor these files are steps, and the order is declared.',
+  body:
+    'You choose the order once, in the pipeline, and it is the same order in QA and in PROD — ' +
+    'not something reconstructed from cron lines later. The graph stops being a picture of ' +
+    'what you have and becomes the thing you edit.',
+  primary: { label: 'Build this as a pipeline — 14 days free →', href: PLATFORM },
+  secondary: { label: 'How run order works', href: 'https://data-conductor.com/docs/pipelines/' },
+  gap: 'run-order',
+  because: 'write-conflict',
+};
+
 const CTA_BY_KIND: Record<FindingKind, CallToAction> = {
-  'write-conflict': {
-    label: 'See how Data Conductor handles run order →',
-    href: 'https://data-conductor.com/docs/pipelines/',
-    because: 'write-conflict',
-  },
-  cycle: {
-    label: 'See how Data Conductor handles run order →',
-    href: 'https://data-conductor.com/docs/pipelines/',
-    because: 'cycle',
-  },
+  'write-conflict': RUN_ORDER,
+  cycle: { ...RUN_ORDER, because: 'cycle' },
+  'parse-failure': { ...RUN_ORDER, because: 'parse-failure' },
   'unresolved-placeholder': {
-    label: 'See how Data Conductor resolves variables per environment →',
-    href: 'https://data-conductor.com/docs/data-builder/#pipeline-variables',
+    headline: 'In Data Conductor every {{variable}} has a row per environment.',
+    body:
+      'QA and PROD are both required, and a save will not complete while a placeholder has no ' +
+      'value in either. Substitution happens server-side at run time, so what an environment ' +
+      'shows is what actually ran.',
+    primary: { label: 'Give these variables a value — 14 days free →', href: PLATFORM },
+    secondary: {
+      label: 'How variables resolve per environment',
+      href: 'https://data-conductor.com/docs/data-builder/#pipeline-variables',
+    },
+    gap: 'variables',
     because: 'unresolved-placeholder',
   },
   'external-dependency': {
-    label: 'See how Data Conductor tests a pipeline before it runs →',
-    href: 'https://data-conductor.com/docs/testing-data-pipelines/',
+    headline: 'In Data Conductor a step can refuse to run on input that is already wrong.',
+    body:
+      'Tests are injected and run in QA and in PROD before a pipeline is promoted. An upstream ' +
+      'job that failed quietly then shows up as a failed assertion, rather than as a number ' +
+      'nobody thought to question.',
+    primary: { label: 'Put a test in front of these reads — 14 days free →', href: PLATFORM },
+    secondary: {
+      label: 'How pipeline testing works',
+      href: 'https://data-conductor.com/docs/testing-data-pipelines/',
+    },
+    gap: 'tests',
     because: 'external-dependency',
   },
-  'parse-failure': {
-    label: 'See how Data Conductor handles run order →',
-    href: 'https://data-conductor.com/docs/pipelines/',
-    because: 'parse-failure',
-  },
   'internal-safe': {
-    label: 'See how Data Conductor keeps it this way →',
-    href: 'https://data-conductor.com/docs/deployment-manager/',
+    headline: 'In Data Conductor this stays true as the folder grows.',
+    body:
+      'Deployments are versioned and diffed, so the day a second file starts writing one of ' +
+      'these tables it appears in the diff rather than in a number that moved. That is the ' +
+      'point at which a set of scripts normally stops being manageable.',
+    primary: { label: 'Keep it this way — 14 days free →', href: PLATFORM },
+    secondary: {
+      label: 'How deployments are versioned',
+      href: 'https://data-conductor.com/docs/deployment-manager/',
+    },
+    gap: 'history',
     because: 'internal-safe',
   },
   clean: {
-    label: 'See how Data Conductor keeps it this way →',
-    href: 'https://data-conductor.com/docs/deployment-manager/',
+    headline: 'In Data Conductor this stays true as the folder grows.',
+    body:
+      'A clean set is clean until the fourth or fifth file arrives. Deployments are versioned ' +
+      'and diffed, so the day a second writer appears you see it in the diff rather than in a ' +
+      'number that moved.',
+    primary: { label: 'Start a pipeline — 14 days free →', href: PLATFORM },
+    secondary: {
+      label: 'How deployments are versioned',
+      href: 'https://data-conductor.com/docs/deployment-manager/',
+    },
+    gap: 'history',
     because: 'clean',
   },
 };
@@ -165,18 +224,42 @@ export function analyse(model: GraphModel, files: FileExtract[]): Finding[] {
       phFiles.get(ph)!.push(f.name);
     }
   }
-  for (const [ph, names] of Array.from(phFiles.entries()).sort()) {
+  // Aggregated once past a handful. A templated estate — every table written
+  // `{{PREP_DB}}.{{PREP_AT_SCHEMA}}.X` — has a dozen distinct tokens, and one
+  // finding per token buries the write conflict under a list of things the
+  // reader already knows. Same failure as rule 5, same fix: say it once.
+  const phEntries = Array.from(phFiles.entries()).sort();
+  if (phEntries.length > 3) {
+    const tokens = phEntries.map(([ph]) => ph);
+    const shown = tokens.slice(0, 8);
+    const names = uniqueStrings(phEntries.flatMap(([, ns]) => ns)).sort();
     found.push({
       kind: 'unresolved-placeholder',
       severity: 'warn',
-      rank: names.length > 1 ? 70 : 65,
-      title: `\`${ph}\` appears in ${names.length} file${names.length > 1 ? 's' : ''} with no value in scope`,
+      rank: 70,
+      title: `${tokens.length} variables have no value in this folder`,
       body:
-        `Found in ${list(names)}. Each one is substituted by something at runtime — but not by ` +
-        `anything in this folder, and not necessarily by the same thing. ` +
-        `${names.length > 1 ? 'Nothing here guarantees these files agree on its value.' : ''}`.trim(),
+        `${list(shown)}${tokens.length > shown.length ? ` and ${tokens.length - shown.length} more` : ''} ` +
+        `appear across ${list(names)}. Each is substituted by something at run time, by nothing ` +
+        `in this folder, and not necessarily by the same thing in each file. The graph above ` +
+        `treats every spelling as a distinct table — so if two of these resolve to the same ` +
+        `name at run time, a write conflict can be hiding behind two of these boxes.`,
       refs: names,
     });
+  } else {
+    for (const [ph, names] of phEntries) {
+      found.push({
+        kind: 'unresolved-placeholder',
+        severity: 'warn',
+        rank: names.length > 1 ? 70 : 65,
+        title: `\`${ph}\` appears in ${names.length} file${names.length > 1 ? 's' : ''} with no value in scope`,
+        body:
+          `Found in ${list(names)}. Each one is substituted by something at runtime — but not by ` +
+          `anything in this folder, and not necessarily by the same thing. ` +
+          `${names.length > 1 ? 'Nothing here guarantees these files agree on its value.' : ''}`.trim(),
+        refs: names,
+      });
+    }
   }
 
   // ── 5. Read but never written here ───────────────────────────────────────

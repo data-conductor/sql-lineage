@@ -19,7 +19,8 @@ const el = {
   sampling: $('sampling'), usesample: $('usesample'), canvas: $('canvas'), graph: $('graph'),
   stats: $('stats'), status: $('status'), findingsblock: $('findingsblock'),
   findsub: $('findsub'), findings: $('findings'), bridge: $('bridge'),
-  cta: $('cta'), download: $('download'),
+  cta: $('cta'), download: $('download'), hover: $('hover'),
+  ctahead: $('ctahead'), ctabody: $('ctabody'), ctaprimary: $('ctaprimary'),
 };
 
 let currentFiles = [];
@@ -53,10 +54,58 @@ const NODE_STYLE = {
   conflict: { fill: '#2a1a12', stroke: '#c2410c', text: '#ffc9a3', dash: null },
 };
 
-const W = 196, H = 46;
+// Nodes carry three lines now: qualifier, table name, status. Real estates
+// name tables `{{PREP_DB}}.{{PREP_AT_SITE_ACTIVITIES}}`, where every table
+// shares the qualifier and head-truncation throws away the only part that
+// differs. Splitting the qualifier off and eliding the MIDDLE keeps both ends.
+const W = 228, H = 60;
+
+// Monospace advance is 0.6em, so the character budget is just inner width
+// over that. Written as a calculation rather than a magic number because the
+// box width is the thing people change.
+const PAD = 14;
+const fitChars = (px) => Math.floor((W - PAD * 2) / (px * 0.6));
+const NAME_CHARS = fitChars(12.5);   // 24
+const SMALL_CHARS = fitChars(10.5);  // 29
+
+/** Elide the middle, not the tail. `{{PREP_AT_SITE_ACTIVITIES}}` keeps both
+ *  the prefix that tells you which system and the suffix that tells you which
+ *  table; trimming the end leaves `{{PREP_AT_S…` and tells you neither. */
+function fitMid(s, n) {
+  s = String(s);
+  if (s.length <= n) return s;
+  const head = Math.ceil((n - 1) * 0.55);
+  return s.slice(0, head) + '…' + s.slice(s.length - (n - 1 - head));
+}
+
+/** Everything before the last dot, kept with it: `a.b.` + `c`. */
+function splitQualifier(label) {
+  const i = String(label).lastIndexOf('.');
+  return i > 0
+    ? { qual: label.slice(0, i + 1), name: label.slice(i + 1) }
+    : { qual: '', name: label };
+}
+
+// Below this scale the 12.5px labels stop being readable, so the canvas
+// scrolls instead of shrinking further. Only bites on wide estates.
+const MIN_SCALE = 0.55;
+let lastDims = null;
+
+function sizeSvg(dims) {
+  const wrap = el.graph.parentElement;
+  if (!wrap) return;
+  // clientWidth INCLUDES the wrapper's padding, so using it directly made
+  // every graph overflow by exactly the padding and show a scrollbar that
+  // scrolled nothing.
+  const cs = getComputedStyle(wrap);
+  const avail = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  el.graph.style.width = `${Math.max(avail, Math.round(dims.width * MIN_SCALE))}px`;
+}
 
 function renderGraph(model) {
   const dims = layout(model, { nodeWidth: W, nodeHeight: H });
+  lastDims = dims;
+  hideCard();
   const svg = el.graph;
   // viewBox + no width/height lets CSS scale the drawing down to fit the
   // column. A fixed pixel width overflowed the page on anything wider than
@@ -66,6 +115,7 @@ function renderGraph(model) {
   svg.removeAttribute('width');
   svg.removeAttribute('height');
   svg.style.aspectRatio = `${dims.width} / ${dims.height}`;
+  sizeSvg(dims);
 
   const byId = new Map(model.nodes.map((n) => [n.id, n]));
   const showEdgeLabels = model.edges.length <= 16;
@@ -106,20 +156,24 @@ function renderGraph(model) {
     }
   }
 
+  nodeDetail.clear();
   for (const n of model.nodes) {
     const conflicted = n.writers.length > 1;
     const st = conflicted ? NODE_STYLE.conflict : (NODE_STYLE[n.kind] || NODE_STYLE.isolated);
-    const sub = conflicted
-      ? `${n.writers.length} writers — conflict`
-      : n.kind === 'internal' ? `internal to ${n.internalTo}`
-      : n.kind === 'source'   ? 'read, never written here'
-      : n.kind === 'output'   ? 'output · nothing reads it'
-      : `derived · ${n.writers.length} writer`;
-    parts.push(`<g>
+    const sub = subtitleFor(n, conflicted);
+    const { qual, name } = splitQualifier(n.label);
+    const qy = n.y + 19;
+    const ny = n.y + (qual ? 36 : 28);
+    const sy = n.y + (qual ? 51 : 44);
+    nodeDetail.set(n.id, detailCard(n, sub, conflicted));
+    parts.push(`<g class="node" tabindex="0" role="button" data-node="${escapeHtml(n.id)}"
+      aria-label="${escapeHtml(n.label)}, ${escapeHtml(sub)}">
+      <title>${escapeHtml(n.label)}\n${escapeHtml(sub)}</title>
       <rect x="${n.x}" y="${n.y}" width="${W}" height="${H}" rx="8" fill="${st.fill}"
         stroke="${st.stroke}" stroke-width="${conflicted ? 1.6 : 1}"${st.dash ? ` stroke-dasharray="${st.dash}"` : ''}/>
-      <text class="nd" x="${n.x + 14}" y="${n.y + 20}" fill="${st.text}">${escapeHtml(trim(n.label, 24))}</text>
-      <text class="fl" x="${n.x + 14}" y="${n.y + 35}"${conflicted ? ' fill="#e08b57"' : ''}>${escapeHtml(sub)}</text>
+      ${qual ? `<text class="nq" x="${n.x + PAD}" y="${qy}">${escapeHtml(fitMid(qual, SMALL_CHARS))}</text>` : ''}
+      <text class="nd" x="${n.x + PAD}" y="${ny}" fill="${st.text}">${escapeHtml(fitMid(name, NAME_CHARS))}</text>
+      <text class="fl" x="${n.x + PAD}" y="${sy}"${conflicted ? ' fill="#e08b57"' : ''}>${escapeHtml(fitMid(sub, SMALL_CHARS))}</text>
     </g>`);
   }
 
@@ -127,7 +181,55 @@ function renderGraph(model) {
   el.canvas.hidden = false;
 }
 
-const trim = (s, n) => (s.length <= n ? s : s.slice(0, n - 1) + '…');
+function subtitleFor(n, conflicted) {
+  return conflicted
+    ? `${n.writers.length} writers — conflict`
+    : n.kind === 'internal' ? `internal to ${n.internalTo}`
+    : n.kind === 'source'   ? 'read, never written here'
+    : n.kind === 'output'   ? 'output · nothing reads it'
+    : `derived · ${n.writers.length} writer`;
+}
+
+/* ── node detail on hover ────────────────────────────────────────────────
+   The box can only ever hold an elided name, so the full one has to be
+   reachable. Native <title> covers the no-JS and touch-and-hold case; this
+   card adds the thing the box has no room for at all — which files write it
+   and which read it. */
+
+const nodeDetail = new Map();
+
+function detailCard(n, sub, conflicted) {
+  const rows = [
+    ['Written by', n.writers.length ? n.writers.join(', ') : 'nothing in this set'],
+    ['Read by', n.readers.length ? n.readers.join(', ') : 'nothing in this set'],
+  ];
+  if (n.placeholders.length) rows.push(['Variables', n.placeholders.join('  ')]);
+  return `<p class="hcname">${escapeHtml(n.label)}</p>
+    <p class="hckind${conflicted ? ' bad' : ''}">${escapeHtml(sub)}</p>
+    <dl>${rows.map(([k, v]) =>
+      `<dt>${k}</dt><dd>${escapeHtml(v)}</dd>`).join('')}</dl>`;
+}
+
+function showCard(g) {
+  const html = nodeDetail.get(g.getAttribute('data-node'));
+  if (!html) return;
+  el.hover.innerHTML = html;
+  el.hover.hidden = false;
+  const wrap = el.graph.parentElement;
+  const wr = wrap.getBoundingClientRect();
+  const gr = g.getBoundingClientRect();
+  const left = gr.left - wr.left + wrap.scrollLeft + gr.width / 2 - el.hover.offsetWidth / 2;
+  let top = gr.bottom - wr.top + 8;
+  if (top + el.hover.offsetHeight > wrap.clientHeight - 4) {
+    top = gr.top - wr.top - el.hover.offsetHeight - 8;
+  }
+  el.hover.style.left = `${Math.round(Math.max(6,
+    Math.min(left, wrap.scrollWidth - el.hover.offsetWidth - 6)))}px`;
+  el.hover.style.top = `${Math.round(Math.max(4, top))}px`;
+}
+
+const hideCard = () => { el.hover.hidden = true; };
+const nodeUnder = (e) => (e.target.closest ? e.target.closest('g[data-node]') : null);
 
 /* ── findings ────────────────────────────────────────────────────────── */
 
@@ -146,8 +248,17 @@ function renderFindings(result) {
       <div><p class="ft">${ticks(f.title)}</p><p class="fb">${ticks(f.body)}</p></div>
     </div>`).join('');
 
-  el.cta.textContent = cta.label;
-  el.cta.href = cta.href;
+  el.ctahead.textContent = cta.headline;
+  el.ctabody.textContent = cta.body;
+  el.ctaprimary.textContent = cta.primary.label;
+  el.ctaprimary.href = cta.primary.href;
+  el.cta.textContent = cta.secondary.label;
+  el.cta.href = cta.secondary.href;
+  // Mark the gap this particular finding lands on, so the four-up reads as a
+  // response to their files rather than as a feature list that is always there.
+  for (const g of document.querySelectorAll('.gap')) {
+    g.classList.toggle('lit', g.dataset.gap === cta.gap);
+  }
   el.findingsblock.hidden = false;
   el.bridge.hidden = false;
 }
@@ -181,7 +292,7 @@ function setFiles(files, sample = false) {
   el.dropzone.classList.add('compact');
   el.filecount.textContent = `${files.length} file${files.length === 1 ? '' : 's'}`;
   el.chips.innerHTML = files
-    .map((f) => `<span class="chip" title="${escapeHtml(f.name)}">${escapeHtml(trim(f.name, 28))}</span>`)
+    .map((f) => `<span class="chip" title="${escapeHtml(f.name)}">${escapeHtml(fitMid(f.name, 28))}</span>`)
     .join('');
   el.sampling.hidden = !sample;
   run();
@@ -235,6 +346,18 @@ window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => e.preventDefault());
 
 el.dialect.addEventListener('change', run);
+
+for (const type of ['mouseover', 'click', 'focusin']) {
+  el.graph.addEventListener(type, (e) => {
+    const g = nodeUnder(e);
+    if (g) showCard(g);
+    else if (type === 'click') hideCard();
+  });
+}
+el.graph.addEventListener('mouseleave', hideCard);
+el.graph.addEventListener('focusout', hideCard);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideCard(); });
+window.addEventListener('resize', () => { if (lastDims) sizeSvg(lastDims); });
 
 el.download.addEventListener('click', () => {
   if (!lastResult) return;

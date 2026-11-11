@@ -60,10 +60,28 @@ h1{font-size:27px;line-height:1.2;margin:28px 0 8px;letter-spacing:-.02em;max-wi
 .sw.src{background:var(--n-src)}.sw.der{background:var(--n-der)}.sw.out{background:var(--n-out)}
 .sw.int{background:var(--n-int)}.sw.bad{background:var(--n-bad)}
 .stats{margin-left:auto}
-.svgwrap{padding:0 10px}
-svg#graph{display:block;width:100%;height:auto}
+.hint{color:#6c7893;font-size:12px}
+.svgwrap{padding:0 10px;position:relative;overflow-x:auto}
+svg#graph{display:block;height:auto}
 .nd{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace}
+.nq{font:10.5px ui-monospace,SFMono-Regular,Menlo,monospace;fill:#6f7c9c}
 .fl{font:10.5px ui-monospace,SFMono-Regular,Menlo,monospace;fill:#7e8cab}
+.node{cursor:pointer}
+.node:focus{outline:none}
+.node:hover rect,.node:focus rect{stroke-width:2.2}
+
+/* The detail card is always on the dark canvas, in either page theme. */
+.hovercard{position:absolute;z-index:5;min-width:230px;max-width:380px;
+  background:#131b29;border:1px solid #2d3850;border-radius:10px;padding:11px 13px;
+  box-shadow:0 12px 30px rgba(0,0,0,.5);pointer-events:none;color:#d8e0ee}
+.hcname{margin:0 0 2px;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;
+  word-break:break-all;color:#eaf0fa}
+.hckind{margin:0 0 9px;font-size:12px;color:#8e9bb8}
+.hckind.bad{color:#e08b57}
+.hovercard dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px}
+.hovercard dt{color:#7e8cab;white-space:nowrap}
+.hovercard dd{margin:0;color:#cfd9ea;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11.5px;word-break:break-word}
 
 h2{font-size:17px;margin:34px 0 4px;letter-spacing:-.01em}
 .h2sub{color:var(--muted);font-size:14px;margin:0 0 14px}
@@ -90,13 +108,25 @@ code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;background:#eef1f6;
 .gap{border:1px solid var(--line);border-radius:9px;padding:11px;background:#fff}
 .gap b{display:block;font-size:13.5px;margin-bottom:3px}
 .gap span{color:var(--muted);font-size:12.5px;line-height:1.45;display:block}
+.handoff{border-top:1px solid var(--line);padding-top:16px}
+.hoh{margin:0 0 5px;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.hob{margin:0 0 14px;color:var(--muted);font-size:13.5px;max-width:66ch}
 .btns{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{text-decoration:none;display:inline-block}
+.linkcta{color:var(--accent);font-size:13.5px;text-decoration:none;
+  border-bottom:1px solid transparent;padding-bottom:1px}
+.linkcta:hover{border-bottom-color:currentColor}
 .btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;
   font-size:14px;font-weight:550;cursor:pointer}
 .btn2{background:#fff;color:var(--fg);border:1px solid var(--line);border-radius:8px;
-  padding:10px 16px;font-size:14px;text-decoration:none;display:inline-block}
+  padding:10px 16px;font-size:14px;text-decoration:none;display:inline-block;
+  font-family:inherit;line-height:1.3;cursor:pointer}
 .btn2:hover{border-color:var(--accent);color:var(--accent)}
-.note{color:var(--muted);font-size:12.5px}
+.note{color:var(--muted);font-size:12.5px;margin:12px 0 0;max-width:62ch}
+
+/* The gap this run's top finding lands on. The other three stay as context. */
+.gap.lit{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.gap.lit b{color:var(--accent)}
 
 .foot{border-top:1px solid var(--line);padding:20px 0 50px;margin-top:10px}
 .foot p{margin:0 0 8px;font-size:13.5px;max-width:70ch}

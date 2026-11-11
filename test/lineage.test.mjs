@@ -33,7 +33,9 @@ test('two files writing one table is a ranked write-conflict finding', async () 
   const top = r.findings[0];
   assert.equal(top.kind, 'write-conflict');
   assert.match(top.title, /2 files write to/);
-  assert.match(r.cta.label, /run order/);
+  assert.match(r.cta.secondary.label, /run order/);
+  assert.match(r.cta.primary.href, /^https:\/\/platform\.data-conductor\.com\//);
+  assert.equal(r.cta.gap, 'run-order');
 });
 
 test('edges come from statement scope, not a file-level cross product', async () => {
@@ -75,4 +77,29 @@ test('an empty set does not throw', async () => {
   const r = await analyseFiles([], 'postgres');
   assert.equal(r.graph.nodes.length, 0);
   assert.equal(r.findings[0].kind, 'clean');
+});
+
+test('a templated estate aggregates its variables into one finding', async () => {
+  // Every table is {{DB}}.{{SCHEMA}}.X, which is how a real Snowflake estate
+  // is written. One finding per token buried the write conflict under
+  // thirteen near-identical warnings.
+  const r = await analyseFiles([{
+    name: 't.sql',
+    sql: `INSERT INTO {{A_DB}}.{{A_SCHEMA}}.OUT (x)
+          SELECT x FROM {{B_DB}}.{{B_SCHEMA}}.SRC WHERE d >= {{START_DATE}};`,
+  }], 'snowflake');
+  const ph = r.findings.filter(f => f.kind === 'unresolved-placeholder');
+  assert.equal(ph.length, 1);
+  assert.match(ph[0].title, /5 variables have no value/);
+  assert.match(ph[0].body, /\{\{A_DB\}\}/);
+});
+
+test('a single unresolved variable still names itself', async () => {
+  const r = await analyseFiles([{
+    name: 't.sql',
+    sql: 'INSERT INTO s.out (x) SELECT x FROM s.src WHERE d >= {{start_date}};',
+  }], 'postgres');
+  const ph = r.findings.filter(f => f.kind === 'unresolved-placeholder');
+  assert.equal(ph.length, 1);
+  assert.match(ph[0].title, /`\{\{start_date\}\}` appears in 1 file/);
 });
