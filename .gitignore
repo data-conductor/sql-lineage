@@ -3,3 +3,4 @@ dist/
 web/vendor/
 *.tgz
 .DS_Store
+web/build/
